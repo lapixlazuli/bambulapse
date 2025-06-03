@@ -2,7 +2,7 @@
 
 O **Bambulapse** é um sistema inteligente de captura de imagem para timelapses externos em impressoras Bambu Lab, utilizando uma câmera USB, sensor ultrassônico HC-SR04 e um Raspberry Pi. Ideal para quem deseja resultados estéticos superiores aos timelapses internos, com mais liberdade de posicionamento e qualidade de imagem.
 
-> ⚠️ Este repositório cobre apenas a parte de software e configuração. A parte de hardware (soldagem, montagem, instalação física) será abordada no site [Makerworld](https://makerworld.com/) <!-- colocar link do stl no makerworld --> onde está disponível o STL para colocar o sensor na impressora.
+> ⚠️ Este repositório cobre apenas a parte de software e configuração. A parte de hardware (soldagem, montagem, instalação física) será abordada no site [Makerworld](https://makerworld.com/pt/models/1484429-bambulab-a1-clean-timelapse-with-webcam#profileId-1550596) onde está disponível o STL para colocar o sensor na impressora.
 
 ---
 
