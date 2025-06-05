@@ -29,7 +29,7 @@ Este projeto oferece uma alternativa: capturar imagens com precisão e sincroniz
 ### 1. Clone o Repositório
 
 ```bash
-git clone https://github.com/lapixlazuli/bambulapse
+git clone https://github.com/lapixlazuli/bambulapse.git
 cd bambulapse
 ```
 
@@ -43,7 +43,7 @@ sudo nano config.sh
 - `video device`: é o número do seu dispositivo de video que foi reconhecido pelo Raspberry pi, obtido com o comando:
 
 ```bash
-v4l2-ctl --device=/dev/video0 --list-formats-ext
+v4l2-ctl --list-devices
 ```
 - `width` e `height`: resolução suportada pela sua webcam
 - `pixel_format`: obtido com o comando:
