@@ -1,253 +1,124 @@
 #!/bin/bash
+# ==============================================================================
+# BAMBULAPSE INSTALLER
+# This script orchestrates the complete installation of the project in a modular way.
+# Author: @thidiasr
+# Versão: 2.0
+# ==============================================================================
 
-source config.sh
+# --- Configuration and Safety Nets ---
+set -e
+set -u
+set -o pipefail
 
-sudo apt-get update
-sudo apt-get install -y motion git build-essential curl
-sudo apt-get install -y v4l-utils
-
-if ! command -v gpio &> /dev/null; then
-    git clone "$WIRINGPI_REPO"
-    cd WiringPi
-    ./build
-    cd ..
-    rm -rf WiringPi
+# Check if the script is run as root
+if [ "$(id -u)" -ne 0 ]; then
+    log_error "This script must be run as root. Please use 'sudo'."
 fi
 
-MOTION_CONF="/etc/motion/motion.conf"
-BACKUP_CONF="/etc/motion/motion.conf.bak"
+# --- Source Shared Functions ---
+source "src/common.sh"
 
-CONF_BASE="daemon on
-target_dir $DIR
-video_device /dev/video$VIDEODEVICE
-video_params width=$WIDTH,height=$HEIGHT,framerate=2,v4l2_palette=$PIXEL_FORMAT,palette=$PIXEL_FORMAT,ID09963776=${BRIGHTNESS},ID09963778=${SATURATION}
-picture_type jpeg
-width $WIDTH
-height $HEIGHT
-snapshot_filename %m-%d-%Y_%H-%M-%S-snapshot
-camera_id 0
-framerate 2
-text_left
-text_right
-text_scale 0
-text_event
-noise_level 1
-noise_tune off
-picture_quality 95
-snapshot_interval 0
-stream_port 8080
-stream_localhost off
-picture_output off
-movie_output off
-webcontrol_port 8081
-webcontrol_localhost off
-"
+# --- Logging Functions with Colors ---
 
-if [ -f "$MOTION_CONF" ]; then
-    if [ ! -f "$BACKUP_CONF" ]; then
-        sudo cp "$MOTION_CONF" "$BACKUP_CONF"
-    fi
-else
-    echo "$CONF_BASE" | sudo tee "$MOTION_CONF" > /dev/null
-    sudo cp "$MOTION_CONF" "$BACKUP_CONF"
-fi
+# Define color codes
+COLOR_GREEN='\033[0;32m'
+COLOR_YELLOW='\033[0;33m'
+COLOR_RED='\033[0;31m'
+COLOR_RESET='\033[0m'
 
-add_or_replace() {
-    local key="$1"
-    local value="$2"
-    if grep -Eq "^[;#]*\s*${key}" "$MOTION_CONF"; then
-        sudo sed -i -E "s|^[;#]*\s*${key}.*|${key} ${value}|" "$MOTION_CONF"
-    else
-        echo "${key} ${value}" | sudo tee -a "$MOTION_CONF" > /dev/null
-    fi
+# Log an informational message (yellow)
+log_info() {
+    echo -e "${COLOR_YELLOW}[INFO] $1${COLOR_RESET}"
 }
 
-update_video_params() {
-    local PARAMS="width=${WIDTH},height=${HEIGHT},framerate=2,v4l2_palette=${PIXEL_FORMAT},palette=${PIXEL_FORMAT},ID09963776=${BRIGHTNESS},ID09963778=${SATURATION}"
-
-    if grep -Eq "^[;#]*\s*video_params" "$MOTION_CONF"; then
-        sudo sed -i -E "s|^[;#]*\s*video_params.*|video_params ${PARAMS}|" "$MOTION_CONF"
-    else
-        echo "video_params ${PARAMS}" | sudo tee -a "$MOTION_CONF" > /dev/null
-    fi
+# Log a success message (green)
+log_success() {
+    echo -e "${COLOR_GREEN}[SUCCESS] $1${COLOR_RESET}"
 }
 
-add_or_replace "daemon" "on"
-add_or_replace "log_level" "4"
-add_or_replace "target_dir" "$DIR"
-add_or_replace "video_device" "/dev/video$VIDEODEVICE"
-add_or_replace "width" "$WIDTH"
-add_or_replace "height" "$HEIGHT"
-add_or_replace "text_left" ""
-add_or_replace "framerate" "2"
-add_or_replace "stream_localhost" "off"
-add_or_replace "snapshot_filename" "%m-%d-%Y_%H-%M-%S-snapshot"
-add_or_replace "text_scale" "0"
-add_or_replace "text_event" ""
-add_or_replace "noise_tune" "off"
-add_or_replace "picture_quality" "95"
-add_or_replace "text_right" ""
-add_or_replace "noise_level" "1"
-add_or_replace "picture_output" "off"
-add_or_replace "movie_output" "off"
-add_or_replace "webcontrol_port" "8081"
-add_or_replace "webcontrol_localhost" "off"
-update_video_params
-
-echo "// Auto-generated GPIO config" > gpio_config.h
-echo "#define TRIG $GPIO_TRIG" >> gpio_config.h
-echo "#define ECHO $GPIO_ECHO" >> gpio_config.h
-
-gcc timelapse.c -o timelapse -lwiringPi
-sudo mv timelapse /usr/local/bin/
-sudo chmod +x /usr/local/bin/timelapse
-
-echo -e '#!/bin/bash\nnohup timelapse > ~/timelapse.log 2>&1 &' | sudo tee /usr/local/bin/start-timelapse > /dev/null
-sudo chmod +x /usr/local/bin/start-timelapse
-
-echo -e '#!/bin/bash\ncurl -s http://localhost:8081/0/action/snapshot' | sudo tee /usr/local/bin/snapshot > /dev/null
-sudo chmod +x /usr/local/bin/snapshot
-
-sudo tee /usr/local/bin/stop-timelapse > /dev/null << 'EOF'
-#!/bin/bash
-
-MOTION_PID=$(pgrep -f motion)
-if [ ! -z "$MOTION_PID" ]; then
-    sudo kill $MOTION_PID
-    echo "Finish Timelapse (PID $MOTION_PID)"
-else
-    echo "No processes found"
-fi
-
-pkill timelapse
-EOF
-
-sudo chmod +x /usr/local/bin/stop-timelapse
-
-sudo tee /usr/local/bin/config-camera > /dev/null << 'EOF'
-#!/bin/bash
-source "/home/lehft/bambulapse/config.sh"
-MOTION_CONF="/etc/motion/motion.conf"
-BACKUP_CONF="/etc/motion/motion.conf.bak"
-
-update_video_params() {
-    local PARAMS="width=${WIDTH},height=${HEIGHT},framerate=2,v4l2_palette=${PIXEL_FORMAT},palette=${PIXEL_FORMAT},ID09963776=${BRIGHTNESS},ID09963778=${SATURATION}"
-
-    if grep -q "^[;#]*\?\s*video_params" "$MOTION_CONF"; then
-        sudo sed -i "s|^[;#]*\?\s*video_params.*|video_params ${PARAMS}|" "$MOTION_CONF"
-    else
-        echo "video_params ${PARAMS}" | sudo tee -a "$MOTION_CONF" > /dev/null
-    fi
-}
-update_target_dir() {
-    if grep -q "^target_dir" "$MOTION_CONF"; then
-        sudo sed -i "s|^target_dir .*|target_dir $TARGET_DIR|" "$MOTION_CONF"
-    else
-        echo "target_dir $TARGET_DIR" | sudo tee -a "$MOTION_CONF" > /dev/null
-    fi
-}
-
-update_video_device() {
-    if grep -q "^video_device" "$MOTION_CONF"; then
-        sudo sed -i "s|^video_device .*|video_device /dev/video$VIDEO_DEVICE|" "$MOTION_CONF"
-    else
-        echo "video_device /dev/video$VIDEO_DEVICE" | sudo tee -a "$MOTION_CONF" > /dev/null
-    fi
-}
-
-if [ ! -f "$MOTION_CONF" ]; then 
-   echo "File $MOTION_CONF not found."
+# Log an error message and exit (red)
+log_error() {
+    echo -e "${COLOR_RED}[ERROR] $1${COLOR_RESET}" >&2
     exit 1
-fi
-
-if [ ! -f "$BACKUP_CONF" ]; then
-    sudo cp "$MOTION_CONF" "$BACKUP_CONF"
-fi
-
-NOWBRIGHTNESS=$(grep -oP 'ID09963776=\\K[0-9]+' "$MOTION_CONF" || echo 50)
-NOWSATURATION=$(grep -oP 'ID09963778=\\K-?[0-9]+' "$MOTION_CONF" || echo 50)
-TARGET_DIR=$(grep "^target_dir" "$MOTION_CONF" | awk '{print $2}')
-[ -z "$TARGET_DIR" ] && TARGET_DIR="/var/lib/motion"
-
-apply_config() {
-    update_video_params
-    update_target_dir
-    update_video_device
 }
 
-while true; do
-    clear
-    echo "===== Camera Configuration ====="
-    echo "Brightness (ID09963776): $NOWBRIGHTNESS"
-    echo "Saturation (ID09963778): $NOWSATURATION"
-    echo "Snapshot Directory: $TARGET_DIR"
-    echo "================================"
-    echo "1) Change Brightness"
-    echo "2) Change Saturation"
-    echo "3) Change Snapshot Directory"
-    echo "4) Change Video Device"
-    echo "5) Apply Configuration"
-    echo "6) Restore Backup"
-    echo "0) Exit"
-    echo "================================"
-    read -p "Select an option: " OPTION
+# --- Main Script Logic ---
 
-    case $OPTION in
-        1)
-            read -p "New Brightness (0-127): " NOWBRIGHTNESS
-            ;;
-        2)
-            read -p "New Saturation (-100 to 100): " NOWSATURATION
-            ;;
-        3)
-            read -p "New Snapshot Directory: " NEW_DIR
-            if [ -d "$NEW_DIR" ]; then
-                TARGET_DIR="$NEW_DIR"
-            else
-                echo "Directory does not exist."
-                sleep 2
-            fi
-            ;;
-        4)
-            read -p "Enter Video Device Number (e.g., 0 for /dev/video0): " NEW_DEVICE
-            if [[ "$NEW_DEVICE" =~ ^[0-9]+$ ]]; then
-                VIDEO_DEVICE="$NEW_DEVICE"
-            else
-                echo "Invalid device number."
-                sleep 2
-            fi
-            ;;    
-        5)
-            apply_config
-            read -p "Press ENTER to continue..."
-            ;;
-        6)
-            sudo cp "$BACKUP_CONF" "$MOTION_CONF"
-            NOWBRIGHTNESS=$(grep -oP 'ID09963776=\\K[0-9]+' "$MOTION_CONF" || echo 50)
-            NOWSATURATION=$(grep -oP 'ID09963778=\\K-?[0-9]+' "$MOTION_CONF" || echo 0)
-            TARGET_DIR=$(grep "^target_dir" "$MOTION_CONF" | awk '{print $2}')
-            [ -z "$TARGET_DIR" ] && TARGET_DIR="/var/lib/motion"
-            VIDEO_DEVICE=$(grep "^video_device" "$MOTION_CONF" | awk -F'/dev/video' '{print $2}')
-            [ -z "$VIDEO_DEVICE" ] && VIDEO_DEVICE="0"
-            read -p "Backup restored. Press ENTER to continue..."
-            ;;
-        0)
-            exit 0
-            ;;
-        *)
-            echo "Invalid option."
-            sleep 1
-            ;;
-    esac
-done
+# Define the directory containing the installation modules
+SCRIPTS_DIR="src"
 
-EOF
+# Verify if the scripts directory exists
+if [ ! -d "$SCRIPTS_DIR" ]; then
+    log_error "Scripts directory '$SCRIPTS_DIR' not found. Aborting."
+fi
 
-sudo chmod +x /usr/local/bin/config-camera
+# Load user settings from the configuration file
+if [ -f "config.sh" ]; then
+    log_info "Loading user settings from config.sh..."
+    source config.sh
+else
+    log_error "Configuration file 'config.sh' not found. Aborting."
+fi
 
-echo "Installation completed!"
-echo "Use:"
-echo "tart-timelapse to start"
-echo "top-timelapse to stop"
-echo "napshot to take snapshot"
-echo "config-camera to adjust camera settings"
+# Export variables to be used by sub-scripts
+export VIDEODEVICE WIDTH HEIGHT BRIGHTNESS SATURATION PIXEL_FORMAT
+export DIR GPIO_TRIG GPIO_ECHO WIRINGPI_REPO
+export SNAPSHOT_DISTANCE=4.1
+export RESET_DISTANCE=7.0
+
+# Grant execute permissions to all scripts in the directory
+log_info "Setting execute permissions for installation scripts..."
+chmod +x "$SCRIPTS_DIR"/*.sh
+
+# --- Script Runner Function ---
+
+# A function to execute and validate each installation step.
+run_script() {
+    local script_path="$1"
+    local step_name="$2"
+
+    echo "" # Add a newline for better spacing
+    log_info "Starting step: $step_name"
+
+    if [ ! -f "$script_path" ]; then
+        log_error "Script for '$step_name' not found at '$script_path'."
+    fi
+
+    # Execute the script with a visual spinner
+    bash "$script_path" &
+    local pid=$!
+    local spin='-\|/'
+    local i=0
+    while kill -0 $pid 2>/dev/null; do
+        i=$(( (i+1) %4 ))
+        printf "\rRunning... ${spin:$i:1}"
+        sleep .1
+    done
+    printf "\r" # Clear the spinner line
+
+    # Wait for the script to finish and check its exit code
+    wait $pid
+    if [ $? -ne 0 ]; then
+        log_error "Step '$step_name' failed. Installation interrupted."
+    fi
+
+    log_success "Step '$step_name' finished."
+}
+
+# --- Installation Steps ---
+
+log_info "Starting Bambulapse installation..."
+
+run_script "$SCRIPTS_DIR/dependencies.sh" "Installing dependencies"
+run_script "$SCRIPTS_DIR/motion.sh" "Configuring Motion"
+run_script "$SCRIPTS_DIR/build.sh" "Compiling the project"
+run_script "$SCRIPTS_DIR/cameraConfig.sh" "Creating camera config script"
+run_script "$SCRIPTS_DIR/timelapseScripts.sh" "Creating timelapse script"
+run_script "$SCRIPTS_DIR/distanceConfig.sh" "Creating distance config script"
+run_script "$SCRIPTS_DIR/help.sh" "Creating help command"
+
+# --- Finalization ---
+echo ""
+log_success "Installation completed successfully!"
+log_info "You can now run the application using the 'bambulapse' command."
