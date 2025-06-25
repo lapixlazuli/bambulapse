@@ -2,6 +2,8 @@
 # ==============================================================================
 # BAMBULAPSE CONTROL SCRIPTS INSTALLER
 #
+# Author: @thidiasr
+#
 # This script creates the core control utilities for the timelapse system:
 # - startlapse: Starts the main timelapse application in the background.
 # - stoplapse:  Stops the timelapse application and the motion service.
@@ -76,11 +78,18 @@ tee /usr/local/bin/snapshot > /dev/null << 'EOF'
 # Manually triggers a single snapshot via the Motion web control API.
 
 echo "Triggering a manual snapshot..."
-# Use 'curl' to send the snapshot action command.
-# '-s' (silent) hides progress meters.
-# '-o /dev/null' discards the output body (the response from motion).
-curl -s -o /dev/null http://localhost:8081/0/action/snapshot
-echo "Snapshot command sent."
+if pgrep -f "motion -c" > /dev/null; then
+    if curl -s -o /dev/null http://localhost:8081/0/action/snapshot; then
+        echo "Snapshot taken successfully."
+    else
+        echo "Command failed. Could not connect to Motion's web control on port 8081."
+    fi
+    else
+    # If pgrep fails, it means the process was not found.
+    echo "Motion service is not running."
+    echo "Please start the service with the 'startlapse' command before taking a snapshot."
+    exit 1
+fi
 EOF
 # Set execute permission.
 chmod +x /usr/local/bin/snapshot

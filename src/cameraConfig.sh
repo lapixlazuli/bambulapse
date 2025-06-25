@@ -2,6 +2,8 @@
 # ==============================================================================
 # BAMBULAPSE CAMERA CONFIG SCRIPT INSTALLER
 #
+# Author: @thidiasr
+#
 # This script creates the 'cfgcamera' utility in /usr/local/bin.
 # The 'cfgcamera' utility provides an interactive menu to configure
 # the Motion service settings for the connected camera.
@@ -27,7 +29,7 @@ tee /usr/local/bin/cfgcamera > /dev/null << 'EOF'
 # ==============================================================================
 # Camera Configuration Utility (cfgcamera)
 #
-# Author: @ronaldinhodoskr
+# Author: @thidiasr
 #
 # This utility provides an interactive TUI menu to safely edit the
 # /etc/motion/motion.conf file. It detects connected cameras and their
@@ -45,6 +47,8 @@ BACKUP_CONF="/etc/motion/motion.conf.bambulapse.bak"
 # Arrays to cache device information, preventing repeated slow calls.
 declare -a DEVICE_NAMES
 declare -a DEVICE_PATHS
+declare -a seen_names
+REGISTERED_ALIAS=""
 
 # --- Logging Functions ---
 # Provides consistent, colored feedback to the user.
@@ -96,14 +100,25 @@ create_backup() {
 
 # Writes the staged changes from shell variables back into the motion.conf file.
 apply_config() {
+    local alias="${1:-}"  # <- Aqui está a correção: evita erro se $1 não for passado
+
     log_info "Applying new configuration..."
-    # Use sed with -i to perform in-place replacements.
-    sed -i -E "s|^video_device .*|video_device /dev/video${VIDEO_DEVICE}|" "$MOTION_CONF"
+
+    local device_path
+    if [ -n "$alias" ]; then
+        device_path="/dev/$alias"
+    else
+        device_path="/dev/video${VIDEO_DEVICE}"
+    fi
+
+    sed -i -E "s|^video_device .*|video_device $device_path|" "$MOTION_CONF"
     sed -i -E "s|^width .*|width $WIDTH|" "$MOTION_CONF"
     sed -i -E "s|^height .*|height $HEIGHT|" "$MOTION_CONF"
     sed -i -E "s|^target_dir .*|target_dir $TARGET_DIR|" "$MOTION_CONF"
+
     local new_video_params="video_params width=${WIDTH},height=${HEIGHT},framerate=30,palette=${PIXELFORMAT},ID09963776=${BRIGHTNESS},ID09963778=${SATURATION}"
     sed -i -E "s|^video_params .*|$new_video_params|" "$MOTION_CONF"
+
     log_success "Configuration saved successfully!"
 }
 
@@ -113,18 +128,92 @@ apply_config() {
 update_device_cache() {
     DEVICE_NAMES=()
     DEVICE_PATHS=()
-    # Use awk to parse v4l2-ctl output into a simple "name;path" format.
+    declare -A seen_names
+
+    local full_output
+    full_output=$(v4l2-ctl --list-devices 2>/dev/null || true)
+    if [ -z "$full_output" ]; then return; fi
+
     local device_list
-    device_list=$(v4l2-ctl --list-devices | awk '/\(usb-/{name=$0; sub(/ \(usb-.*/,"",name); getline; if($1 ~ /^\/dev\/video[0-9]+$/) print name ";" $1}')
+    device_list=$(echo "$full_output" | awk '
+        /^[^\t]/ {
+            if ($0 ~ /usb-/) {
+                is_usb = 1
+                name = $0
+                sub(/ \(usb-.*/, "", name)
+            } else {
+                is_usb = 0
+            }
+        }
+        /^\t/ && is_usb == 1 {
+            if ($1 ~ /^\/dev\/video[0-9]+/) {
+                print name ";" $1
+            }
+        }
+    ')
+
     if [ -n "$device_list" ]; then
-        while IFS=';' read -r name path; do
-            DEVICE_NAMES+=("$name")
-            DEVICE_PATHS+=("$path")
+        while IFS=';' read -r current_name current_path; do
+            # Corrige espaços nos nomes
+            current_name="$(echo "$current_name" | xargs)"
+            if [[ -z "${seen_names[$current_name]+_}" ]]; then
+                seen_names["$current_name"]=1
+                DEVICE_NAMES+=("$current_name")
+                DEVICE_PATHS+=("$current_path")
+            fi
         done <<< "$device_list"
     fi
 }
 
-# Gets the friendly name (e.g., "Logitech Webcam") of the current device from the cache.
+register_webcam_alias() {
+    VIDEO_DEVICE="${VIDEO_DEVICE##*/video}"
+    local dev_path="/dev/video${VIDEO_DEVICE}"
+    local udev_rule_file="/etc/udev/rules.d/99-local.rules"
+
+    if [ ! -e "$dev_path" ]; then
+        log_error "Device $dev_path does not exist."
+        return 1
+    fi
+
+    local id_vendor id_product
+    id_vendor=$(udevadm info --query=all --name="$dev_path" | grep "ID_VENDOR_ID" | cut -d'=' -f2)
+    id_product=$(udevadm info --query=all --name="$dev_path" | grep "ID_MODEL_ID" | cut -d'=' -f2)
+
+    if [ -z "$id_vendor" ] || [ -z "$id_product" ]; then
+        log_info "idVendor/idProduct not found. Using original path (/dev/videoX)."
+        REGISTERED_ALIAS=""
+        return 0
+    fi
+
+    local existing_line=""
+    if [ -f "$udev_rule_file" ]; then
+        existing_line=$(grep "$id_vendor" "$udev_rule_file" | grep "$id_product" || true)
+    fi
+
+    if [ -n "$existing_line" ]; then
+        REGISTERED_ALIAS=$(echo "$existing_line" | grep -oP 'SYMLINK\+="\K[^"]+')
+        return 0
+    fi
+
+    # if no alias exists, create a new one
+    while [ -f "$udev_rule_file" ] && grep -q "webcam$i" "$udev_rule_file"; do
+        ((i++))
+    done
+    alias="webcam$i"
+
+    echo "Creating alias: $alias"
+
+    # Create the udev rule to create a symlink for the webcam
+    sudo bash -c "echo 'SUBSYSTEM==\"video4linux\", ATTRS{idVendor}==\"$id_vendor\", ATTRS{idProduct}==\"$id_product\", SYMLINK+=\"$alias\"' >> \"$udev_rule_file\""
+    sudo udevadm control --reload-rules
+    sudo udevadm trigger
+
+    REGISTERED_ALIAS="$alias"
+    log_success "Webcam registered as /dev/$REGISTERED_ALIAS"
+    return 0
+}
+
+# Gets the friendly name (e.g., "HD Logitech Webcam") of the current device from the cache.
 get_current_device_name() {
     local target_path="/dev/video${VIDEO_DEVICE}"
     for i in "${!DEVICE_PATHS[@]}"; do
@@ -204,7 +293,7 @@ select_resolution() {
     if [ ${#options[@]} -eq 0 ]; then
         log_error "No resolutions found for format $format_to_find. The camera may not support it properly."
     fi
-    
+
     # Sort resolutions numerically by width, then height (descending) and remove duplicates.
     # -t'x': use 'x' as delimiter.
     # -k1,1nr: sort by 1st field, numeric, reverse.
@@ -216,7 +305,7 @@ select_resolution() {
     clear
     echo "Select a resolution for $format_to_find:"
     for i in "${!options[@]}"; do echo "  $((i+1))) ${options[$i]}"; done
-    
+
     while true; do
         read -p "Your choice: " choice
         if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le ${#options[@]} ]; then
@@ -257,7 +346,17 @@ while true; do
         3) read -e -p "Enter new snapshot path: " -i "$TARGET_DIR" val; if [ -d "$val" ]; then TARGET_DIR="$val"; else log_info "Directory does not exist." && sleep 2; fi ;;
         4) if select_usb_device; then update_device_cache; fi ;;
         5) if select_pixel_format && select_resolution "$SELECTED_PIXEL_FORMAT"; then PIXELFORMAT=$(map_format_to_palette_id "$SELECTED_PIXEL_FORMAT"); log_success "Selection updated."; else log_info "Selection cancelled."; fi; sleep 2 ;;
-        [sS]) apply_config; log_info "Exiting."; exit 0 ;;
+        [sS])
+            register_webcam_alias
+            if [ -n "$REGISTERED_ALIAS" ]; then
+                log_success "Alias registrado: /dev/$REGISTERED_ALIAS"
+            else
+                log_info "Nenhum alias registrado. Usando /dev/video$VIDEO_DEVICE"
+            fi
+            apply_config "${REGISTERED_ALIAS:-}"
+            log_info "Exiting."
+            exit 0
+        ;;
         [rR]) if [ -f "$BACKUP_CONF" ]; then cp "$BACKUP_CONF" "$MOTION_CONF"; log_success "Backup restored!"; load_current_values; else log_info "No backup file found."; fi; sleep 2 ;;
         [qQ]) log_info "Exiting without saving changes."; exit 0 ;;
         *) log_info "Invalid option." && sleep 1 ;;
