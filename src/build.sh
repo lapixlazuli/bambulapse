@@ -2,6 +2,8 @@
 # ==============================================================================
 # BAMBULAPSE BUILD SCRIPT (SMART VERSION)
 #
+# Author: @thidiasr
+#
 # This script compiles the C programs. It now intelligently checks if
 # config headers exist before creating them, preserving user changes.
 # ==============================================================================
@@ -27,6 +29,7 @@ if [ ! -f "gpio_config.h" ] || [ ! -f "distance_config.h" ]; then
         echo "// Auto-generated during initial installation"
         printf "#define SNAPSHOTDISTANCE %.1ff\n" "$SNAPSHOT_DISTANCE"
         printf "#define RESETDISTANCE %.1ff\n" "$RESET_DISTANCE"
+        printf "#define PAUSESECS %.1ff\n" "$PAUSE_SECS"
     } > "distance_config.h"
 
     # Write gpio_config.h
