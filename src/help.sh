@@ -2,6 +2,8 @@
 # ==============================================================================
 # BAMBULAPSE HELP SCRIPT INSTALLER
 #
+# Author: @thidiasr
+#
 # This script creates the main 'bambulapse' command, which acts as a
 # help menu, displaying all available commands for the user.
 # ==============================================================================

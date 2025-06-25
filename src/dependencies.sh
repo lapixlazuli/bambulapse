@@ -2,6 +2,8 @@
 # ==============================================================================
 # BAMBULAPSE DEPENDENCIES SCRIPT
 #
+# Author: @thidiasr
+#
 # This script installs all system-level dependencies required for the project,
 # including system packages via apt and the WiringPi library for GPIO control.
 # ==============================================================================

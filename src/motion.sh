@@ -2,6 +2,8 @@
 # ==============================================================================
 # BAMBULAPSE MOTION CONFIGURATION SCRIPT
 #
+# Author: @thidiasr
+#
 # This script configures the /etc/motion/motion.conf file with the
 # optimal settings for the Bambulapse project. It ensures that essential
 # parameters are set, whether they exist in the file already or not.

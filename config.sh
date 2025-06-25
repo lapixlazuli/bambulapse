@@ -1,7 +1,9 @@
 # ==============================================================================
 # BAMBULAPSE PROJECT CONFIGURATION
 #
-# This file contains all the user-configurable variables for the installation.
+# Author: @thidiasr
+#
+# This file contains all the default-configurable variables for the installation.
 # Modify these values before running the main 'install.sh' script.
 # ==============================================================================
 

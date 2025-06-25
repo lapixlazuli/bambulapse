@@ -2,6 +2,8 @@
 # ==============================================================================
 # COMMON FUNCTIONS LIBRARY
 #
+# Author: @thidiasr
+#
 # This file contains shared functions (like logging with colors) to be used
 # by other scripts in the project, promoting code reuse and consistency.
 # ==============================================================================
