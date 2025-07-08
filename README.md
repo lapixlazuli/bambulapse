@@ -36,7 +36,7 @@ cd bambulapse
 ### 2. Execute o Instalador
 
 ```bash
-bash install.sh
+sudo bash install.sh
 ```
 
 ### 3. Configure sua camera
@@ -44,23 +44,22 @@ bash install.sh
 -Rode o comando:
 ```bash
 cd bambulapse
-cfgcamera
+sudo cfgcamera
 ```
  Veja se a câmera indicada no menu está certa, se não entre na opção 4 do menu para escolher o dispositivo.
 
 ```bash
-===== Camera Config =====
-1) Brightness (0-63): 62
-2) Saturation (-100 to 100): 50
-3) Snapshot path: /home/lehft/TimelapseShare
-4) Video device: Anker PowerConf C200: Anker Pow
-5) Resolution: 1920x1090
---------------------------------
-1) Apply and save configs
-2) Backup restore
-3) Exit
-================================
-Select an option:
+==================== Camera Configuration Menu ====================
+1) Brightness (0-63)        : 62
+2) Saturation (-100 to 100) : 50
+3) Snapshot path            : /home/lehft/TimelapseShare
+4) Video device             : Anker PowerConf C200: Anker Pow
+5) Resolution & Format      : 1920x1090
+-----------------------------------------------------------------
+S) Save and Apply Changes   Q) Quit Without Saving
+R) Restore from Backup
+=================================================================
+Select an option: 
 ```
 
 Digite o número correspondente ao da sua webcam.
@@ -74,7 +73,7 @@ Your choice:
 ```
 Digite o número que for igual ao da sua webcam e depois pressione `ENTER` para voltar ao menu.
 
-Entre no menu `Resolution` digitando `5` e apertando `ENTER`, logo aparecerá algo parecido com isso:
+Entre no menu `Resolution` digitando `5` e aparecerá algo parecido com isso:
 
 ```bash
 Searching available pixel formats...
@@ -107,7 +106,7 @@ Your choice:
 ```
 
 Selecionada a resolução, volte ao menu princiapal.
-Aplique as configurações digitando `6`
+Aplique as configurações digitando `s`
 
 ### 3. Configure seu sensor
 
@@ -119,7 +118,7 @@ testdistance
 Vai aparecer a configuração de distancia padrão, então aparecerá algo como:
 
 ```bash
-Start test with SNAPSHOT=4.10 e RESET=7.00
+Start test with SNAPSHOT=3.00 e RESET=7.00
 Press ENTER to start measure...
 ```
 Ao começar a medição apertando `ENTER`, o sensor começará a medir a distândia do sua impressora, nesse ponto é importante notar que:
@@ -128,7 +127,7 @@ Ao começar a medição apertando `ENTER`, o sensor começará a medir a distân
 ATTENTION ----> MEASURES <---- ATTENTION
 Inside snapshot distance!
 Last distance measure: -1 cm
-Current snapshot distance config: 4.10 cm
+Current snapshot distance config: 3.00 cm
 ```
    #### *•* Ou se aparecer diversas vezes a mensagem:
 ```bash
@@ -150,20 +149,22 @@ Reading failure.
    
 ![measure3](https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExZWNpaW5oYzJjdzhidnY1dnliZnQ2aXN6NHMwMmpnaXM5MHgxdjV6eSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/okzReKaSD4Zhk3rrQn/giphy.gif)
 
-4.  Agora, para descobrir a medida final para o sensor saber exatamente o momento de tirar a foto, vamos posicionar o bico no final do sensor e mover levemente, apenas para ter uma folga. Feito isso, basta verificar a medida do sensor. Aqui cheguei ao resultado de 4,2 cm; abaixo disso, a medida do sensor fica meio imprecisa.
+1.  Agora, para descobrir a medida final para o sensor saber exatamente o momento de tirar a foto, vamos posicionar o bico no final do sensor e mover levemente, apenas para ter uma folga. Feito isso, basta verificar a medida do sensor. Aqui cheguei ao resultado de 3.0 cm; abaixo disso, a medida do sensor fica imprecisa.
    
 ![measure4](https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExMzFtMWJpcm9wZGt2bTF3N3hrbGxzdnR1MjY4Mjl3NTZ5emFvdmxzYSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/kKL3QTBbuCUi5WxgTJ/giphy.gif)
 
-5. Caso tenha que mudar alguma medida, basta rodar o comando `cfgdistance` e alterar as medidas de Snapshot e Reset. (Opção 1 e 2)
+1. Caso tenha que mudar alguma medida, basta rodar o comando `sudo cfgdistance` e alterar as medidas de Snapshot e Reset (Opção 1 e 2). A 3º opção configura o tempo de pausa entre a leitura final do sensor e o momento da captura do snapshot (padrão 1 segundo).
 
 ```bash
-===== Timelapse Distance Configuration =====
-1) Snapshot Distance (current: 4.1)
-2) Reset Distance    (current: 7.0)
-3) Change GPIO TRIG  (current: 2)
-4) Change GPIO ECHO  (current: 5)
-5) Aplly
-6)  exit
+===== Sensor Distance & GPIO Configuration =====
+1) Snapshot Distance (cm)       : 7.0
+2) Reset Distance    (cm)       : 3.0
+3) Pause to snapshot (s)        : 1.0
+4) Change GPIO TRIG  (WiringPi) : 5
+5) Change GPIO ECHO  (WiringPi) : 2
+-------------------------------------------------
+S) Save and Exit
+Q) Quit Without Saving
 ============================================
 Choose an option:
 ```
@@ -221,13 +222,13 @@ snapshot
 2. Se quiser parar o timelapse, rode:
 
 ```bash
-stoplapse
+sudo stoplapse
 ```
 
 5. Para alterar as configurações da câmera, só digitar para o Raspberry:
 
 ```bash
-cfgcamera
+sudo cfgcamera
 ```
 
 6. Para testar o sensor hc-sr04, rode o comando:
@@ -239,7 +240,7 @@ testdistance
 6. Para configurar as medidas do timelapse, rode:
 
 ```bash
-cfgdistance
+sudo cfgdistance
 ```
 
 7. Para acessar a lista de comandos no Raspberry Pi, digite:

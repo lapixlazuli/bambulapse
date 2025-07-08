@@ -68,7 +68,7 @@ export VIDEODEVICE WIDTH HEIGHT BRIGHTNESS SATURATION PIXEL_FORMAT
 export DIR GPIO_TRIG GPIO_ECHO WIRINGPI_REPO
 export SNAPSHOT_DISTANCE=4.1
 export RESET_DISTANCE=7.0
-export PAUSE_SECS=1
+export PAUSESECS=1
 
 # Grant execute permissions to all scripts in the directory
 log_info "Setting execute permissions for installation scripts..."

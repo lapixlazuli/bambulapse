@@ -125,7 +125,7 @@ int main() {
         if (distance > 0) {
             if (distance < SNAPSHOTDISTANCE) {
                 // Give camera time to stabilize and take a snapshot.
-                usleep((useconds_t)(PAUSE_SECS * 1000000));
+                usleep((useconds_t)(PAUSESECS * 1000000));
                 system("curl -s http://localhost:8081/0/action/snapshot");
                 while (distance < RESETDISTANCE) {
                     //Wait for the nozzle to move away.
